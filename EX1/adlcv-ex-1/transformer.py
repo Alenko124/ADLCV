@@ -146,7 +146,7 @@ class TransformerClassifier(nn.Module):
 
         # Initialize cls token parameter
         if self.pool == 'cls':
-            #self.cls_token = ... # Institate an nn.Parameter with size: 1,1,embed_dim
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) # Institate an nn.Parameter with size: 1,1,embed_dim
             max_seq_len +=1
         
         if self.pos_enc == 'fixed':
@@ -171,8 +171,9 @@ class TransformerClassifier(nn.Module):
         # Include cls token in the input sequence
         ####################### insert code here #######################
         if self.pool == 'cls':
-            # HINT: repeat the cls token of the batch dimension
-            pass
+            cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+            tokens = torch.cat([cls_tokens, tokens], dim=1)
+            seq_length += 1
         ################################################################
 
         x = self.positional_encoding(tokens)
@@ -188,7 +189,7 @@ class TransformerClassifier(nn.Module):
         ####################### insert code here #######################
         elif self.pool == 'cls':
             # HINT: get the first output token of the transfomer.
-            pass
+            x = x[:, 0]
         ################################################################
 
         return self.classifier(x)
