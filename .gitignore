@@ -1,0 +1,22 @@
+# virtual environments
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# uv / cache
+.cache/
+.uv/
+
+# vscode
+.vscode/
+.vscode-server/
+
+# logs & outputs
+wandb/
+outputs/
+multirun/
+
+# OS junk
+.DS_Store
