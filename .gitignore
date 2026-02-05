@@ -19,4 +19,8 @@ outputs/
 multirun/
 
 # OS junk
-.DS_Store
+*:Zone.Identifier
+
+.data/
+data/
+
