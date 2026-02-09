@@ -6,13 +6,16 @@ from torch import nn
 import torch.nn.functional as F
 from torchtext import data, datasets, vocab
 import tqdm
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 
 from transformer import TransformerClassifier, to_device
 
 NUM_CLS = 2
 VOCAB_SIZE = 50_000
-SAMPLED_RATIO = 0.2
+SAMPLED_RATIO = 0.5
 MAX_SEQ_LEN = 512
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
 def set_seed(seed=1):
     random.seed(seed)
@@ -40,9 +43,33 @@ def prepare_data_iter(sampled_ratio=0.2, batch_size=16):
 
     return train_iter, test_iter
 
+def prepare_data_iter_bert(batch_size=16, sampled_ratio=0.2):
+
+    TEXT = data.RawField()
+    LABEL = data.RawField()
+
+    tdata, _ = datasets.IMDB.splits(TEXT, LABEL)
+
+    # ⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇
+    if sampled_ratio < 1.0:
+        reduced_tdata, _ = tdata.split(split_ratio=sampled_ratio)
+    else:
+        reduced_tdata = tdata
+    # ⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆⬆
+    train, test = reduced_tdata.split(split_ratio=0.8)
+
+    print("training:", len(train), "test:", len(test))
+
+    train_iter, test_iter = data.BucketIterator.splits(
+        (train, test),
+        batch_size=batch_size,
+        shuffle=True
+    )
+
+    return train_iter, test_iter
 
 def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
-         pos_enc='fixed', pool='cls', dropout=0.0, fc_dim=None,
+         pos_enc='learnable', pool='cls', dropout=0.0, fc_dim=None,
          batch_size=16, lr=1e-4, warmup_steps=625, 
          weight_decay=1e-4, gradient_clipping=1
     ):
@@ -51,11 +78,11 @@ def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
     
     loss_function = nn.CrossEntropyLoss()
 
-    train_iter, test_iter = prepare_data_iter(sampled_ratio=SAMPLED_RATIO, 
-                                            batch_size=batch_size
-    )
+    train_iter, test_iter = prepare_data_iter_bert(sampled_ratio=SAMPLED_RATIO, batch_size=batch_size)
+    #train_iter, test_iter = prepare_data_iter(sampled_ratio=SAMPLED_RATIO, batch_size=batch_size)
 
     print(pool)
+    """
     model = TransformerClassifier(embed_dim=embed_dim, 
                                   num_heads=num_heads, 
                                   num_layers=num_layers,
@@ -67,6 +94,12 @@ def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
                                   num_tokens=VOCAB_SIZE, 
                                   num_classes=NUM_CLS,
                                   )
+    """                
+    model = AutoModelForSequenceClassification.from_pretrained(
+    "distilbert-base-uncased",
+    num_labels=NUM_CLS
+    )
+
     
     if torch.cuda.is_available():
         model = model.to('cuda')
@@ -81,12 +114,36 @@ def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
         running_loss = 0.0
         for batch in tqdm.tqdm(train_iter):
             opt.zero_grad()
+            enc = tokenizer(
+                batch.text,
+                padding=True,
+                truncation=True,
+                max_length=MAX_SEQ_LEN,
+                return_tensors="pt"
+            )
+            
+            input_ids = enc["input_ids"].to(device)
+            attention_mask = enc["attention_mask"].to(device)
+            label_map = {"neg": 0, "pos": 1}
+
+            label = torch.tensor(
+                [label_map[l] for l in batch.label],
+                device=device
+            )
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask
+            )
+            """
             input_seq = batch.text[0].to(device)
             batch_size, seq_len = input_seq.size()
             label = (batch.label - 1).to(device)
             if seq_len > MAX_SEQ_LEN:
                 input_seq = input_seq[:, :MAX_SEQ_LEN]
-            out = model(input_seq)
+            #out = model(input_seq)
+            """
+            out = outputs.logits
             loss = loss_function(out, label) # compute loss
             loss.backward() # backward
             # if the total gradient vector has a length > 1, we clip it back down to 1.
@@ -95,6 +152,43 @@ def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
             opt.step()
             sch.step()
             running_loss += loss.item()
+        with torch.no_grad():
+            model.eval()
+            tot, cor = 0, 0
+
+            label_map = {"neg": 0, "pos": 1}
+
+            for batch in test_iter:
+                enc = tokenizer(
+                    batch.text,
+                    padding=True,
+                    truncation=True,
+                    max_length=MAX_SEQ_LEN,
+                    return_tensors="pt"
+                )
+
+                input_ids = enc["input_ids"].to(device)
+                attention_mask = enc["attention_mask"].to(device)
+
+                labels = torch.tensor(
+                    [label_map[l] for l in batch.label],
+                    device=device
+                )
+
+                outputs = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask
+                )
+
+                preds = outputs.logits.argmax(dim=1)
+
+                tot += labels.size(0)
+                cor += (preds == labels).sum().item()
+
+            acc = cor / tot
+            print(f"-- validation accuracy {acc:.3f}")
+
+        """
         with torch.no_grad():
             model.eval()
             tot, cor= 0.0, 0.0
@@ -111,7 +205,7 @@ def main(embed_dim=128, num_heads=4, num_layers=4, num_epochs=20,
             print(f'-- {"validation"} accuracy {acc:.3}')
             avg_loss = running_loss / len(train_iter)
             print(f'-- training loss {avg_loss:.4f}')
-
+        """
 if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"]= str(0)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  

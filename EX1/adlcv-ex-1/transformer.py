@@ -118,15 +118,29 @@ class PositionalEncoding(nn.Module):
 
 class PositionalEmbedding(nn.Module):
     def __init__(self, embed_dim, max_seq_len=512):
-
         super(PositionalEmbedding, self).__init__()
-        self.pe = nn.Embedding(embedding_dim=embed_dim, num_embeddings=max_seq_len)
+        self.pe = nn.Embedding(
+            num_embeddings=max_seq_len,
+            embedding_dim=embed_dim
+        )
 
     def forward(self, x):
         batch_size, seq_length, embed_dim = x.size()
-        positions = self.pe(torch.arange(seq_length, device=to_device()))
-        positions = positions[None, :, :].expand(batch_size, seq_length, embed_dim)
-        return x + positions
+
+        # positions: [0, 1, 2, ..., seq_length-1]
+        positions = torch.arange(
+            seq_length,
+            device=x.device
+        )
+
+        # positional embeddings: (seq_length, embed_dim)
+        pos_emb = self.pe(positions)
+
+        # expand to batch: (batch_size, seq_length, embed_dim)
+        pos_emb = pos_emb.unsqueeze(0)
+
+        return x + pos_emb
+
         
 
 class TransformerClassifier(nn.Module):
