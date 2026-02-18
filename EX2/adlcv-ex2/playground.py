@@ -34,22 +34,24 @@ def image_to_patches(image, patch_size, image_grid=True):
         HINT: B x c x H x W to B x C x num_patches_h x patch_h x num_patches_w x patch_w
         where H = num_patches_h * patch_h, W=num_patches_w * patch_w to
         """
-        patches = ...
+        patches = image.reshape(B, C, H // patch_h, patch_h, W // patch_w, patch_w)
 
         """
         Create num_patches_h*num_patches_w images of size patch_h x patch_w
         HINT: B x C x num_patches_h x patch_h x num_patches_w x patch_w -> 
             B x (num_patches_h*num_patches_w ) x C x patch_h x patch_w
         """
-        patches = ...
+        patches = patches.permute(0, 2, 4, 1, 3, 5).reshape(B, (H // patch_h) * (W // patch_w), C, patch_h, patch_w)
+
     else:
         """
         Again split the image to patches but flatten each patch. 
         Output Dimensions should be: 
         B x (num_patches_h*num_patches_w ) x (C ( patch_h * patch_w)
         """
-        patches = ...
-        patches = ...
+        patches = image.reshape(B, C, H // patch_h, patch_h, W // patch_w, patch_w).permute(0, 2, 4, 1, 3, 5)
+        patches = patches.reshape(B, (H // patch_h) * (W // patch_w), C * patch_h * patch_w)
+
         
         assert patches.size()== (batch_size, num_patches , (patch_h * patch_w * C))
     return patches
@@ -72,7 +74,9 @@ if __name__ == "__main__":
     plt.title("Image examples from CIFAR10 dataset")
     plt.imshow(img_grid)
     plt.axis('off')
-    plt.show()
+    plt.savefig("cifar10_examples.png", bbox_inches='tight', dpi=300)
+    plt.close()
+
 
     # convert images to patches
     print(f'shape of input images (batch):  {example_images.shape}')
@@ -82,15 +86,21 @@ if __name__ == "__main__":
     # visualize patches
     fig, ax = plt.subplots(example_images.shape[0], 1, figsize=(14,3))
     fig.suptitle("Images as input sequences of patches")
+
     for i in range(example_images.shape[0]):
-        img_grid = torchvision.utils.make_grid(img_patches[i], 
-                                            nrow=img_patches.shape[1], 
-                                            normalize=True, pad_value=0.9
+        img_grid = torchvision.utils.make_grid(
+            img_patches[i],
+            nrow=img_patches.shape[1],
+            normalize=True,
+            pad_value=0.9
         )
         img_grid = img_grid.permute(1, 2, 0)
         ax[i].imshow(img_grid)
         ax[i].axis('off')
-    plt.show()
+
+    plt.savefig("cifar10_patches.png", bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
 
     # test input patches before linear embedding layer
     img_patches = image_to_patches(example_images, patch_size=(4,4), image_grid=False)
@@ -110,4 +120,5 @@ if __name__ == "__main__":
     plt.xlabel('Dimension')
     plt.ylabel('Position in the sequence')
     plt.gca().invert_yaxis()
-    plt.show()
+    plt.savefig("positional_encoding_2d.png", bbox_inches='tight', dpi=300)
+    plt.close()

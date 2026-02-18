@@ -54,8 +54,12 @@ class Attention(nn.Module):
 
         assert attention.size() == (batch_size*self.num_heads, seq_len, seq_len)
         assert out.size() == (batch_size, seq_len, embed_dim)
-
-        return self.o_projection(out)
+        attention = rearrange(
+            attention,
+            '(b h) s1 s2 -> b h s1 s2',
+            h=self.num_heads
+        )
+        return self.o_projection(out), attention
 
 class EncoderBlock(nn.Module):
     def __init__(self, embed_dim, num_heads, fc_dim=None, dropout=0.0):
@@ -76,7 +80,8 @@ class EncoderBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        attention_out = self.attention(x)
+        attention_out, attn = self.attention(x)
+        self.last_attn = attn
         x = self.layernorm1(attention_out + x)
         x = self.dropout(x)
         fc_out = self.fc(x)
@@ -115,11 +120,17 @@ class ViT(nn.Module):
         #       2) Stack Rearrange layer with a linear projection layer using nn.Sequential
         #          Consider including LayerNorm layers before and after the linear projection
         ######## insert code here ########
-        #
-        #
-        #
-        #
-        #
+
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange(
+                'b c (h ph) (w pw) -> b (h w) (c ph pw)',
+                ph=patch_h,
+                pw=patch_w
+            ),
+            nn.LayerNorm(patch_dim),
+            nn.Linear(patch_dim, embed_dim),
+            nn.LayerNorm(embed_dim),
+        )
         #################################
 
         if self.pos_enc == 'learnable':
