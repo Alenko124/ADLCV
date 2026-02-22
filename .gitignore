@@ -24,3 +24,10 @@ multirun/
 .data/
 data/
 
+checkpoints*/
+
+# Svi .out fajlovi
+*.out
+
+# Svi .err fajlovi
+*.err

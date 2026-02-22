@@ -1,6 +1,6 @@
 import torch
 from gpt import AndersenGPT
-from train import (
+from scratch256 import (
     EMBED_DIM,
     MAX_SEQ_LEN,
     MODEL_SAVE_PATH,

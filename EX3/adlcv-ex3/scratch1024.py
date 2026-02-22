@@ -21,15 +21,15 @@ MAX_SEQ_LEN = 1024  # Context length
 PRETRAINED_TOKENIZER = "gpt2"
 POS_ENC = "learnable"  # Options: learnable, fixed
 # Training
-START_FROM_PRETRAINED_GPT2_CHECKPOINT = True
+START_FROM_PRETRAINED_GPT2_CHECKPOINT = False
 BATCH_SIZE = 3
-NUM_EPOCHS = 1
+NUM_EPOCHS = 20
 LR = 1e-4
 WARMUP_STEPS = 625
 WEIGHT_DECAY = 1e-4
 GRADIENT_CLIPPING = 1.0
 DATASET_NAME = "monurcan/andersen_fairy_tales"
-MODEL_SAVE_PATH = "checkpoints"
+MODEL_SAVE_PATH = "checkpoints_scratch"
 
 
 # -----------------------

@@ -173,7 +173,7 @@ def main():
         prompt = input("Prompt: ").strip()  # Stripping is for tokenization weirdness
         if prompt.lower() in ["quit", "exit"]:
             break
-        generated_text = beam_search_generate_text(
+        generated_text = generate_text(
             model, tokenizer, prompt, max_gen_len=500, device=device
         )
         print("\n--- Generated Text ---")

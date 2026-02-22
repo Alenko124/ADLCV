@@ -35,7 +35,7 @@ def generate_text(model, tokenizer, prompt, max_gen_len=500, device="cpu"):
         next_token_logits = logits[:, -1, :]  # shape: [B, vocab_size]
 
         # You will implement two strategies for generating the next token:
-        strategy = "sampling"
+        strategy = "greedy"
         if strategy == "greedy":
             # Greedy: choose the token with highest probability.
             next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
@@ -173,7 +173,7 @@ def main():
         prompt = input("Prompt: ").strip()  # Stripping is for tokenization weirdness
         if prompt.lower() in ["quit", "exit"]:
             break
-        generated_text = beam_search_generate_text(
+        generated_text = generate_text(
             model, tokenizer, prompt, max_gen_len=500, device=device
         )
         print("\n--- Generated Text ---")
