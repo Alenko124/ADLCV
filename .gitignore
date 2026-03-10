@@ -31,3 +31,7 @@ checkpoints*/
 
 # Svi .err fajlovi
 *.err
+
+*.pt
+*.pth
+events.out*
