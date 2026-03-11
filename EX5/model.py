@@ -140,8 +140,11 @@ class UNet(nn.Module):
         if num_classes is not None:
             # Project one-hot encoded labels to the time embedding dimension 
             # Implement it as a 2-layer MLP with a GELU activation in-between
-            # self.label_emb = ...
-            pass
+            self.label_emb = nn.Sequential(
+                nn.Linear(num_classes, time_dim),
+                nn.GELU(),
+                nn.Linear(time_dim, time_dim)
+            )
             
 
     def forward(self, x, t, y=None):
@@ -151,7 +154,8 @@ class UNet(nn.Module):
 
         if y is not None:
             # Add label and time embeddings together
-            pass
+            y_emb = self.label_emb(y.float())
+            t = t + y_emb
             
         x1 = self.inc(x)
         x2 = self.down1(x1, t)
@@ -176,7 +180,55 @@ class UNet(nn.Module):
 class Classifier(nn.Module):
     def __init__(self, img_size=16, c_in=3, labels=5, time_dim=256, device="cuda", channels=32):
         super().__init__()
-        pass
+
+        self.device = device
+        self.time_dim = time_dim
+
+        # --- encoder (isti kao UNet) ---
+        self.inc = DoubleConv(c_in, channels)
+
+        self.down1 = Down(channels, channels*2, emb_dim=time_dim)
+        self.sa1 = SelfAttention(channels*2, img_size//2)
+
+        self.down2 = Down(channels*2, channels*4, emb_dim=time_dim)
+        self.sa2 = SelfAttention(channels*4, img_size//4)
+
+        self.down3 = Down(channels*4, channels*4, emb_dim=time_dim)
+        self.sa3 = SelfAttention(channels*4, img_size//8)
+
+        # bottleneck
+        self.bot1 = DoubleConv(channels*4, channels*8)
+        self.bot2 = DoubleConv(channels*8, channels*8)
+
+        # classifier head
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(channels*8, labels)
 
     def forward(self, x, t):
-        return
+
+        # timestep embedding (isti kao u UNet)
+        t = t.unsqueeze(-1).type(torch.float)
+        t = pos_encoding(t, self.time_dim, self.device)
+
+        # encoder
+        x1 = self.inc(x)
+
+        x2 = self.down1(x1, t)
+        x2 = self.sa1(x2)
+
+        x3 = self.down2(x2, t)
+        x3 = self.sa2(x3)
+
+        x4 = self.down3(x3, t)
+        x4 = self.sa3(x4)
+
+        x4 = self.bot1(x4)
+        x4 = self.bot2(x4)
+
+        # global pooling
+        h = self.pool(x4)
+        h = h.view(h.shape[0], -1)
+
+        logits = self.fc(h)
+
+        return logits

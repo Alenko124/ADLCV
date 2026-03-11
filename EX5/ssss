@@ -1,0 +1,35 @@
+    start_idx = 0
+
+    for images, _ in tqdm(test_loader):
+
+        images = images.to(device)
+        original = get_features(model, images)
+        
+        # classifier guidance
+        y = torch.randint(0, 5, (images.shape[0],), device=device)
+        cg_images = ddpm_cg.p_sample_loop(unet_ddpm, images.shape[0], y=y, verbose=False)
+        cg_images = vgg_transform(cg_images/255.0)
+        cg_features = get_features(model, cg_images)
+
+        # classifier-free guidance
+        y = F.one_hot(y, num_classes=5).float()
+        cFg_images = ddpm_cFg.p_sample_loop(unet_ddpm_cFg, images.shape[0], y=y, verbose=False)
+        cFg_images = vgg_transform(cFg_images/255.0)
+        cFg_features = get_features(model, cFg_images)
+
+        # store features
+        original_feat[start_idx:start_idx + original.shape[0]] = original
+        generated_feat_cg[start_idx:start_idx + original.shape[0]] = cg_features
+        generated_feat_cFg[start_idx:start_idx + original.shape[0]] = cFg_features
+
+        start_idx = start_idx + original.shape[0]
+    
+
+    mu_original, sigma_original = feature_statistics(original_feat)
+    mu_cg, sigma_cg = feature_statistics(generated_feat_cg)
+    mu_cFg, sigma_cFg = feature_statistics(generated_feat_cFg)
+
+    fid_cg = frechet_distance(mu_original, sigma_original, mu_cg, sigma_cg)
+    fid_cFg = frechet_distance(mu_original, sigma_original, mu_cFg, sigma_cFg)
+    print(f'[FID classifier guidance] {fid_cg:.3f}')
+    print(f'[classifier-free guidance] {fid_cFg:.3f}')

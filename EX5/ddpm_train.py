@@ -46,7 +46,7 @@ def create_result_folders(experiment_name):
 
 def train(T=500, cfg=True, img_size=16, input_channels=3, channels=32, 
           time_dim=256, batch_size=100, lr=1e-3, num_epochs=30, 
-          experiment_name="DDPM-cfg", show=False, device='cpu'):
+          experiment_name="DDPM-cfg", show=False, device='cuda'):
 
     create_result_folders(experiment_name)
     train_loader,_,_ = prepare_dataloaders(batch_size)
@@ -83,13 +83,14 @@ def train(T=500, cfg=True, img_size=16, input_channels=3, channels=32,
             # Train a diffusion model with classifier-free guidance
             # Do not forget randomly discard labels
             p_uncod = 0.1
+            if labels is not None and torch.rand(1).item() < p_uncod:
+                labels = None
+            
+            t = diffusion.sample_timesteps(images.shape[0])
+            x_t, noise = diffusion.q_sample(images, t)
+            predicted_noise = model(x_t, t, labels)
+            loss = F.mse_loss(predicted_noise, noise)
 
-            ...
-
-            t = ...
-            x_t, noise = ...
-            predicted_noise = ...
-            loss = ...
 
             optimizer.zero_grad()
             loss.backward()

@@ -1,5 +1,6 @@
 import os
 import matplotlib.pyplot as plt
+from classifier_eval import show_n_forward
 from scipy import linalg
 from tqdm import tqdm
 
@@ -53,9 +54,14 @@ def frechet_distance(mu1, sigma1, mu2, sigma2):
     # HINT: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.sqrtm.html
     # Implement FID score
 
-    fid = ...
+    diff = mu1 - mu2
 
-    return fid
+    # matrix square root of sigma1 * sigma2
+    covmean = linalg.sqrtm(sigma1 @ sigma2)
+    # numerical stability
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+    return np.sum(diff**2) + np.trace(sigma1 + sigma2 - 2.0 * covmean)
 
 if __name__ == '__main__':
     set_seed()
@@ -102,20 +108,22 @@ if __name__ == '__main__':
 
     start_idx = 0
 
-    for images, _ in tqdm(test_loader):
+    for images, labels in tqdm(test_loader):
 
         images = images.to(device)
+        labels = labels.to(device)
+
         original = get_features(model, images)
-        
-        # classifier guidance
-        y = torch.randint(0, 5, (images.shape[0],), device=device)
+
+        # classifier guidance (koristi prave labele)
+        y = labels
         cg_images = ddpm_cg.p_sample_loop(unet_ddpm, images.shape[0], y=y, verbose=False)
         cg_images = vgg_transform(cg_images/255.0)
         cg_features = get_features(model, cg_images)
 
         # classifier-free guidance
-        y = F.one_hot(y, num_classes=5).float()
-        cFg_images = ddpm_cFg.p_sample_loop(unet_ddpm_cFg, images.shape[0], y=y, verbose=False)
+        y_onehot = F.one_hot(labels, num_classes=5).float()
+        cFg_images = ddpm_cFg.p_sample_loop(unet_ddpm_cFg, images.shape[0], y=y_onehot, verbose=False)
         cFg_images = vgg_transform(cFg_images/255.0)
         cFg_features = get_features(model, cFg_images)
 
@@ -124,9 +132,8 @@ if __name__ == '__main__':
         generated_feat_cg[start_idx:start_idx + original.shape[0]] = cg_features
         generated_feat_cFg[start_idx:start_idx + original.shape[0]] = cFg_features
 
-        start_idx = start_idx + original.shape[0]
+        start_idx += original.shape[0]
     
-
     mu_original, sigma_original = feature_statistics(original_feat)
     mu_cg, sigma_cg = feature_statistics(generated_feat_cg)
     mu_cFg, sigma_cFg = feature_statistics(generated_feat_cFg)

@@ -23,7 +23,7 @@ def create_result_folders(experiment_name):
     os.makedirs(os.path.join("weights", experiment_name), exist_ok=True)
 
 
-def train(device='cpu', T=500, img_size=16, input_channels=3, channels=32, time_dim=256):
+def train(device='cuda', T=500, img_size=16, input_channels=3, channels=32, time_dim=256):
 
     exp_name = 'classifier'
     create_result_folders(exp_name)
@@ -47,13 +47,33 @@ def train(device='cpu', T=500, img_size=16, input_channels=3, channels=32, time_
 
     for epoch in pbar:
         model.train()
+        epoch_loss = 0
         for images, labels in train_loader:
             images = images.to(device)
             labels = labels.to(device)
 
             # Do not forget to noise your images !
 
-            ...
+            batch_size = images.shape[0]
+
+            # sample timestep
+            t = diffusion.sample_timesteps(batch_size)
+
+            # forward diffusion
+            x_t, _ = diffusion.q_sample(images, t)
+
+            # classifier prediction
+            logits = model(x_t, t)
+
+            loss = loss_fn(logits, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss / len(train_loader)
+        pbar.set_postfix(loss=avg_loss)    
     
     # save your checkpoint in weights/classifier/model.pth
     torch.save(model.state_dict(), os.path.join("weights", exp_name, 'model.pth'))
