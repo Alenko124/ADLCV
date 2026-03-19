@@ -324,7 +324,7 @@ if __name__ == "__main__":
     src_img, edited_img = edit_with_cross_attn_control(
         input_image,
         source_prompt="A photograph of a puppy on the grass",
-        target_prompt="A photograph of a cat on the grass",
+        target_prompt="A photograph of a puppy on the snow",
         num_inference_steps=50,
         guidance_scale=7.5,
         injection_threshold=0.5,

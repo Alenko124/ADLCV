@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.13.0",
     "datasets==3.2.0",
+    "diffusers>=0.37.0",
     "einops==0.8.1",
     "matplotlib>=3.10.8",
     "numpy==2.2.2",

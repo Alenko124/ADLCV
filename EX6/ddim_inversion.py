@@ -99,7 +99,18 @@ def invert(start_latents, prompt, guidance_scale=3.5, num_inference_steps=80,
         #
         # latents = ...
         # ─────────────────────────────────────────────────────────────────────
+        # 1. sqrt vrijednosti
+        sqrt_alpha_t = torch.sqrt(alpha_t)
+        sqrt_alpha_t_next = torch.sqrt(alpha_t_next)
 
+        sqrt_one_minus_alpha_t = torch.sqrt(1 - alpha_t)
+        sqrt_one_minus_alpha_t_next = torch.sqrt(1 - alpha_t_next)
+
+        # 2. predikcija clean latent x_0
+        x0_pred = (latents - sqrt_one_minus_alpha_t * noise_pred) / sqrt_alpha_t
+
+        # 3. DDIM inversion update (t → t+1)
+        latents = sqrt_alpha_t_next * x0_pred + sqrt_one_minus_alpha_t_next * noise_pred
         intermediate_latents.append(latents)
 
     return torch.cat(intermediate_latents)
@@ -118,7 +129,7 @@ if __name__ == "__main__":
     input_image = load_image(
         "https://images.pexels.com/photos/8306128/pexels-photo-8306128.jpeg"
     ).resize((512, 512))
-    input_image_prompt = "Photograph of a puppy on the grass"
+    input_image_prompt = "Photograph of a cat on the grass"
 
     with torch.no_grad():
         latent = pipe.vae.encode(

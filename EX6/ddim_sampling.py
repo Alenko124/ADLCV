@@ -114,6 +114,18 @@ def sample(prompt, start_step=0, start_latents=None,
         #
         # latents = ...
         # ─────────────────────────────────────────────────────────────────────
+        # 1. sqrt vrijednosti
+        sqrt_alpha_t = torch.sqrt(alpha_t)
+        sqrt_alpha_t_prev = torch.sqrt(alpha_t_prev)
+
+        sqrt_one_minus_alpha_t = torch.sqrt(1 - alpha_t)
+        sqrt_one_minus_alpha_t_prev = torch.sqrt(1 - alpha_t_prev)
+
+        # 2. predikcija clean latent x_0
+        x0_pred = (latents - sqrt_one_minus_alpha_t * noise_pred) / sqrt_alpha_t
+
+        # 3. DDIM update (deterministički)
+        latents = sqrt_alpha_t_prev * x0_pred + sqrt_one_minus_alpha_t_prev * noise_pred
 
     # Decode the final latent back to pixel space
     images = pipe.decode_latents(latents)
@@ -125,8 +137,8 @@ def sample(prompt, start_step=0, start_latents=None,
 if __name__ == "__main__":
     from PIL import Image
 
-    prompt = "Watercolor painting of Nyhavn, Copenhagen"
-    negative_prompt = "blurry, ugly, stock photo"
+    prompt = "Edin Dzeko scoring a goal in a packed stadium, cinematic lighting, ultra-realistic"
+    negative_prompt = "blurry, ugly, stock photo, low quality"
 
     images = sample(prompt, negative_prompt=negative_prompt, num_inference_steps=50)
     images[0].save("ddim_sample_output.png")

@@ -174,7 +174,45 @@ def aggregate_attention_maps(attention_maps, num_heads, res=16):
     # avg_map = ...  # shape: (num_text_tokens, res, res)
     # return avg_map
     # ─────────────────────────────────────────────────────────────────────────
-    raise NotImplementedError("Implement aggregate_attention_maps (TODO above)")
+    valid_maps = []
+
+    for attn in attention_maps:
+        # 1. filter po rezoluciji
+        if attn.shape[1] != res * res:
+            continue
+
+        # attn: (batch*heads, H*W, seq)
+        b_heads, hw, seq_len = attn.shape
+
+        # 2. izračunaj batch size
+        batch = b_heads // num_heads
+
+        # reshape → (batch, heads, H*W, seq)
+        attn = attn.view(batch, num_heads, hw, seq_len)
+
+        # 3. uzmi samo conditional (CFG)
+        if batch > 1:
+            attn = attn[1:2]  # shape: (1, heads, H*W, seq)
+
+        # 4. average preko heads → (1, H*W, seq)
+        attn = attn.mean(dim=1)
+
+        # 5. reshape u (1, seq, H, W)
+        attn = attn.permute(0, 2, 1)  # (1, seq, H*W)
+        attn = attn.view(1, seq_len, res, res)
+
+        valid_maps.append(attn)
+
+    # 6. stack + average preko layera
+    if len(valid_maps) == 0:
+        raise ValueError("No attention maps found for given resolution")
+
+    avg_map = torch.cat(valid_maps, dim=0).mean(dim=0, keepdim=True)
+
+    # 7. remove batch dim → (seq, res, res)
+    avg_map = avg_map.squeeze(0)
+
+    return avg_map
 
 
 @torch.no_grad()
@@ -262,7 +300,7 @@ def visualize_cross_attention(prompt, num_inference_steps=20, guidance_scale=7.5
 
 
 if __name__ == "__main__":
-    prompt = "a fluffy cat sitting on a wooden table"
+    prompt = "Serbian flag"
     visualize_cross_attention(
         prompt,
         num_inference_steps=20,
